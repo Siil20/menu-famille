@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f97316">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Menu Hebdo Perso V4.16 - Famille</title>
+    <title>Menu Hebdo Perso V4.17 - Famille</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -52,7 +52,7 @@
             <div class="flex items-center gap-2.5">
                 <div class="bg-orange-500 p-2 rounded-xl text-white shadow-sm"><i class="fas fa-utensils"></i></div>
                 <div>
-                    <h1 class="text-base md:text-xl font-extrabold tracking-tight leading-none">Menu Hebdo <span class="text-orange-500">V4.16</span></h1>
+                    <h1 class="text-base md:text-xl font-extrabold tracking-tight leading-none">Menu Hebdo <span class="text-orange-500">V4.17</span></h1>
                     <div class="flex items-center gap-2 mt-0.5">
                         <p class="text-[10px] text-stone-400 font-semibold hidden sm:block">Ingrédients • Recipe Keeper • Lidl & Carrefour</p>
                         <span id="sync-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-stone-100 text-stone-500"><i class="fas fa-hdd mr-1"></i>Local</span>
@@ -2132,13 +2132,45 @@ const _memoryStorage = {};
         function saveRecurring() { safeStorage.setItem('recurringGroups_v42', JSON.stringify(recurringGroups)); syncToCloud(); }
 
         // ==================== SYNCHRONISATION TEMPS RÉEL FIREBASE FIRESTORE ====================
+        var DEFAULT_FIREBASE_CONFIG = {
+            "apiKey": "AIzaSyAC94W2mcxF8niHP4JvYGSTN2fWKJdnVRc",
+            "authDomain": "menu-famille-bed18.firebaseapp.com",
+            "projectId": "menu-famille-bed18",
+            "storageBucket": "menu-famille-bed18.firebasestorage.app",
+            "messagingSenderId": "839983369686",
+            "appId": "1:839983369686:web:885c6bcf8265b4fc66877"
+        };
+
         function initFirebaseFromStorage() {
             const savedCfg = safeStorage.getItem('fbConfig_v42');
             const familyId = safeStorage.getItem('fbFamilyId_v42') || 'famille-brault';
             document.getElementById('fb-family-id').value = familyId;
+            var cfgObj = null;
             if (savedCfg) {
-                document.getElementById('fb-config-input').value = savedCfg;
-                connectFirebase(JSON.parse(savedCfg), familyId);
+                try { cfgObj = JSON.parse(savedCfg); } catch (e) {}
+            }
+            if (!cfgObj) {
+                cfgObj = DEFAULT_FIREBASE_CONFIG;
+                safeStorage.setItem('fbConfig_v42', JSON.stringify(cfgObj));
+                safeStorage.setItem('fbFamilyId_v42', familyId);
+            }
+            document.getElementById('fb-config-input').value = JSON.stringify(cfgObj, null, 2);
+            connectFirebase(cfgObj, familyId);
+        }
+
+        function parseLooseFirebaseConfig(rawText) {
+            var trimmed = (rawText || '').trim();
+            var match = trimmed.match(/\{[\s\S]*\}/);
+            if (!match) throw new Error("Aucun bloc { ... } trouvé.");
+            var block = match[0];
+            try {
+                return JSON.parse(block);
+            } catch (e1) {
+                // Convert unquoted object keys (e.g. apiKey: "...") to quoted JSON keys and strip trailing commas
+                var jsonReady = block
+                    .replace(/([a-zA-Z0-9_]+)\s*:/g, '"$1":')
+                    .replace(/,\s*([}\]])/g, '$1');
+                return JSON.parse(jsonReady);
             }
         }
 
@@ -2146,8 +2178,7 @@ const _memoryStorage = {};
             const raw = document.getElementById('fb-config-input').value.trim();
             const familyId = document.getElementById('fb-family-id').value.trim() || 'famille-brault';
             try {
-                const cleaned = raw.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
-                const cfg = JSON.parse(cleaned);
+                const cfg = parseLooseFirebaseConfig(raw);
                 safeStorage.setItem('fbConfig_v42', JSON.stringify(cfg));
                 safeStorage.setItem('fbFamilyId_v42', familyId);
                 connectFirebase(cfg, familyId);
